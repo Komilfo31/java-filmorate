@@ -26,5 +26,6 @@ public class AllExceptionHandler {
     }
 
 
-    record ErrorResponse(String error) {}
+    record ErrorResponse(String error) {
+    }
 }
