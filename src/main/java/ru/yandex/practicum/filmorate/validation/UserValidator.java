@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.validation;
 
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.ConditionsNotMetException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
@@ -9,6 +10,9 @@ import java.time.LocalDate;
 @Component
 public class UserValidator {
     public void validate(User user) {
+        if (user == null) {
+            throw new ValidationException("User не может быть пустым");
+        }
         validateEmail(user.getEmail());
         validateLogin(user.getLogin());
         validateName(user);

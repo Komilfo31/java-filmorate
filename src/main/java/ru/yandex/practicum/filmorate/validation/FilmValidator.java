@@ -2,14 +2,24 @@ package ru.yandex.practicum.filmorate.validation;
 
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.ConditionsNotMetException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.storage.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
 
 @Component
 public class FilmValidator {
+    private final FilmStorage filmStorage;
+    private final UserStorage userStorage;
     private static final LocalDate MIN_RELEASE_DATE = LocalDate.of(1895, 12, 28);
     private static final int MAX_DESCRIPTION_LENGTH = 200;
+
+    public FilmValidator(FilmStorage filmStorage, UserStorage userStorage) {
+        this.filmStorage = filmStorage;
+        this.userStorage = userStorage;
+    }
 
     public void validate(Film film) {
         validateName(film.getName());
@@ -42,6 +52,18 @@ public class FilmValidator {
     private void validateDuration(float duration) {
         if (duration <= 0) {
             throw new ConditionsNotMetException("Продолжительность фильма должна быть положительной");
+        }
+    }
+
+    public void validateFilmExists(long filmId) {
+        if (!filmStorage.exists(filmId)) {
+            throw new NotFoundException("Фильм с ID=" + filmId + " не найден");
+        }
+    }
+
+    public void validateUserExists(long userId) {
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь с ID=" + userId + " не найден");
         }
     }
 }

@@ -1,45 +1,40 @@
 package ru.yandex.practicum.filmorate.storage;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.model.User;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-@Component
+@Repository
 public class InMemoryUserStorage implements UserStorage {
     private final Map<Long, User> users = new HashMap<>();
-    private final long currentId = 0;
+    private long idCounter = 1;
 
     @Override
-    public User create(User user) {
-        return null;
+    public User saveUser(User user) {
+        user.setId(idCounter++);
+        users.put(user.getId(), user);
+        return user;
     }
 
     @Override
-    public User update(User user) {
-        return null;
+    public User updateUser(User user) {
+        users.put(user.getId(), user);
+        return user;
     }
 
     @Override
-    public void delete(Long id) {
-
+    public Optional<User> getUserById(Long id) {
+        return Optional.ofNullable(users.get(id));
     }
 
     @Override
-    public User getById(Long id) {
-        return null;
-    }
-
-    @Override
-    public Collection<User> findAll() {
-        return List.of();
+    public List<User> getAllUsers() {
+        return new ArrayList<>(users.values());
     }
 
     @Override
     public boolean exists(Long id) {
-        return false;
+        return users.containsKey(id);
     }
 }
