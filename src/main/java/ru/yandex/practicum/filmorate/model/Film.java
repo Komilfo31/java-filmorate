@@ -28,4 +28,10 @@ public class Film {
     private float duration;
 
     private final Set<Long> likes = new HashSet<>();
+
+    @NotNull
+    private Set<Genre> genres = new HashSet<>();
+
+    @NotNull
+    private Mpa mpa;
 }
