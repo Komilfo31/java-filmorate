@@ -59,18 +59,18 @@ public class FilmDbStorage implements FilmStorage {
             """;
 
     private static final String INSERT_QUERY = """
-            INSERT INTO films (name, description, release_date, duration, mpa_rating_id) 
+            INSERT INTO films (name, description, release_date, duration, mpa_rating_id)
             VALUES (?, ?, ?, ?, ?)
             """;
 
     private static final String UPDATE_QUERY = """
-            UPDATE films 
-            SET name = ?, description = ?, release_date = ?, duration = ?, mpa_rating_id = ? 
+            UPDATE films
+            SET name = ?, description = ?, release_date = ?, duration = ?, mpa_rating_id = ?
             WHERE id = ?
             """;
 
     private static final String GET_POPULAR_FILMS_QUERY = """
-            SELECT 
+            SELECT
                 f.id,
                 f.name,
                 f.description,
@@ -86,9 +86,9 @@ public class FilmDbStorage implements FilmStorage {
             """;
 
     private static final String GET_GENRES_QUERY = """
-            SELECT g.id, g.name 
-            FROM film_genres fg 
-            JOIN genres g ON fg.genre_id = g.id 
+            SELECT g.id, g.name
+            FROM film_genres fg
+            JOIN genres g ON fg.genre_id = g.id
             WHERE fg.film_id = ?
             """;
 
