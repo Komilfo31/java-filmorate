@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.AllArgsConstructor;
 
+
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,7 +32,5 @@ public class User {
 
     private final Set<Long> friends = new HashSet<>();
 
-    @NotNull
-    private Set<Friendship> friendships = new HashSet<>();
 
 }

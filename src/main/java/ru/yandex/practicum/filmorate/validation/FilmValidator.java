@@ -1,5 +1,7 @@
 package ru.yandex.practicum.filmorate.validation;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.ConditionsNotMetException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
@@ -16,10 +18,14 @@ public class FilmValidator {
     private static final LocalDate MIN_RELEASE_DATE = LocalDate.of(1895, 12, 28);
     private static final int MAX_DESCRIPTION_LENGTH = 200;
 
-    public FilmValidator(FilmStorage filmStorage, UserStorage userStorage) {
+    @Autowired
+    public FilmValidator(
+            @Qualifier("dbFilmStorage") FilmStorage filmStorage,
+            @Qualifier("dbUserStorage") UserStorage userStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
     }
+
 
     public void validate(Film film) {
         validateName(film.getName());
