@@ -24,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -53,7 +54,7 @@ public class FilmDbStorageTest {
     @DisplayName("Создание фильма с основными полями")
     @Test
     public void testCreateFilm() {
-        Film savedFilm = filmDbStorage.saveFilm(film);
+        Film savedFilm = filmDbStorage.createFilm(film);
 
         assertThat(savedFilm).isNotNull();
         assertThat(savedFilm.getId()).isNotNull();
@@ -66,7 +67,7 @@ public class FilmDbStorageTest {
     @DisplayName("Получение фильма по id")
     @Test
     public void testGetFilmById() {
-        Film savedFilm = filmDbStorage.saveFilm(film);
+        Film savedFilm = filmDbStorage.createFilm(film);
 
         Optional<Film> foundFilmOptional = filmDbStorage.getFilmById(savedFilm.getId());
 
@@ -83,18 +84,37 @@ public class FilmDbStorageTest {
     @DisplayName("Обновление фильма")
     @Test
     public void testUpdateFilm() {
-        Film savedFilm = filmDbStorage.saveFilm(film);
+        Film newFilm = Film.builder()
+                .name("Original Name")
+                .duration(100)
+                .description("Original Description")
+                .releaseDate(LocalDate.parse("1996-11-25"))
+                .mpa(mpa)
+                .build();
 
-        savedFilm.setName("Updated Name");
-        savedFilm.setDescription("Updated Description");
+        Film createdFilm = filmDbStorage.createFilm(newFilm);
+        assertNotNull(createdFilm.getId(), "Фильм должен получить ID при создании");
+
+        Film filmToUpdate = Film.builder()
+                .id(createdFilm.getId()) // Используем ID созданного фильма
+                .name("Updated Name")
+                .duration(120)
+                .description("Updated Description")
+                .releaseDate(LocalDate.parse("1997-12-26"))
+                .mpa(mpaStorage.getMpaById(2).orElseThrow())
+                .build();
 
         Genre genre = genreService.getGenreById(1);
-        savedFilm.setGenres(new LinkedHashSet<>(Collections.singletonList(genre)));
+        filmToUpdate.setGenres(new LinkedHashSet<>(Collections.singletonList(genre)));
 
-        Film updatedFilm = filmDbStorage.saveFilm(savedFilm);
+        Film updatedFilm = filmDbStorage.updateFilm(filmToUpdate);
 
+        assertEquals(createdFilm.getId(), updatedFilm.getId(), "ID должен остаться прежним");
         assertEquals("Updated Name", updatedFilm.getName());
         assertEquals("Updated Description", updatedFilm.getDescription());
+        assertEquals(120, updatedFilm.getDuration());
+        assertEquals(LocalDate.parse("1997-12-26"), updatedFilm.getReleaseDate());
+        assertEquals(2, updatedFilm.getMpa().getId());
         assertEquals(1, updatedFilm.getGenres().size());
         assertTrue(updatedFilm.getGenres().contains(genre));
     }
@@ -102,7 +122,7 @@ public class FilmDbStorageTest {
     @DisplayName("Получение списка всех фильмов")
     @Test
     public void testGetAllFilms() {
-        Film savedFilm = filmDbStorage.saveFilm(film);
+        Film savedFilm = filmDbStorage.createFilm(film);
 
         List<Film> films = filmDbStorage.getAllFilms();
 
@@ -113,7 +133,7 @@ public class FilmDbStorageTest {
     @DisplayName("Получение популярных фильмов")
     @Test
     public void testGetPopularFilms() {
-        Film savedFilm = filmDbStorage.saveFilm(film);
+        Film savedFilm = filmDbStorage.createFilm(film);
 
         List<Film> popularFilms = filmDbStorage.getPopularFilms(10);
 

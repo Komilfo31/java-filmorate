@@ -2,12 +2,14 @@ package ru.yandex.practicum.filmorate.storage.db;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import ru.yandex.practicum.filmorate.exception.DataRetrievalException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.mapper.UserRowMapper;
 import ru.yandex.practicum.filmorate.model.User;
@@ -16,9 +18,16 @@ import ru.yandex.practicum.filmorate.storage.UserStorage;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Repository
 @Qualifier("dbUserStorage")
@@ -56,7 +65,7 @@ public class UserDbStorage implements UserStorage {
     public Optional<User> getUserById(Long id) {
         try {
             User user = jdbcTemplate.queryForObject(
-                    "SELECT * FROM users WHERE id = ?",
+                    "SELECT u.id, u.email, u.login, u.name, u.birthday FROM users u WHERE u.id = ?",
                     userRowMapper,
                     id
             );
@@ -67,6 +76,8 @@ public class UserDbStorage implements UserStorage {
             return Optional.ofNullable(user);
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
+        } catch (DataAccessException e) {
+            throw new DataRetrievalException("Ошибка при получении пользователя из базы данных", e);
         }
     }
 
@@ -93,8 +104,23 @@ public class UserDbStorage implements UserStorage {
     @Override
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
-        List<User> users = jdbcTemplate.query("SELECT * FROM users", userRowMapper);
-        users.forEach(userId -> getFriends(userId.getId()));
+        String sql = "SELECT u.id, u.email, u.login, u.name, u.birthday FROM users u";
+        List<User> users = jdbcTemplate.query(sql, userRowMapper);
+
+        if (!users.isEmpty()) {
+            Map<Long, List<User>> friendsByUser = getFriendsForUsers(
+                    users.stream().map(User::getId).collect(Collectors.toList())
+            );
+
+            users.forEach(user -> {
+                Set<Long> friendIds = friendsByUser.getOrDefault(user.getId(), Collections.emptyList())
+                        .stream()
+                        .map(User::getId)
+                        .collect(Collectors.toSet());
+                user.getFriends();
+            });
+        }
+
         return users;
     }
 
@@ -149,7 +175,7 @@ public class UserDbStorage implements UserStorage {
             throw new NotFoundException("Пользователь не найден");
         }
 
-        String sql = "SELECT u.* FROM users u JOIN friendships f ON u.id = f.friend_id WHERE f.user_id = ?";
+        String sql = "SELECT u.id, u.email, u.login, u.name, u.birthday FROM users u JOIN friendships f ON u.id = f.friend_id WHERE f.user_id = ?";
         return jdbcTemplate.query(sql, userRowMapper, userId);
     }
 
@@ -157,12 +183,47 @@ public class UserDbStorage implements UserStorage {
     @Transactional(readOnly = true)
     public List<User> getCommonFriends(long userId, long otherId) {
         String sql = """
-                SELECT u.* FROM users u
+                SELECT u.id, u.email, u.login, u.name, u.birthday FROM users u
                 JOIN friendships f1 ON u.id = f1.friend_id AND f1.user_id = ?
                 JOIN friendships f2 ON u.id = f2.friend_id AND f2.user_id = ?
                 """;
         return jdbcTemplate.query(sql, userRowMapper, userId, otherId);
     }
 
+    public Map<Long, List<User>> getFriendsForUsers(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
 
+        String placeholders = userIds.stream()
+                .map(id -> "?")
+                .collect(Collectors.joining(","));
+
+        String sql = String.format(
+                "SELECT f.user_id, u.id, u.email, u.login, u.name, u.birthday " +
+                        "FROM friendships f " +
+                        "JOIN users u ON f.friend_id = u.id " +
+                        "WHERE f.user_id IN (%s)",
+                placeholders
+        );
+
+        Object[] params = userIds.toArray();
+
+        Map<Long, List<User>> result = new HashMap<>();
+
+        jdbcTemplate.query(sql, params, rs -> {
+            Long userId = rs.getLong("user_id");
+            User friend = new User(
+                    rs.getLong("id"),
+                    rs.getString("email"),
+                    rs.getString("login"),
+                    rs.getString("name"),
+                    rs.getDate("birthday").toLocalDate()
+            );
+            result.computeIfAbsent(userId, k -> new ArrayList<>())
+                    .add(friend);
+        });
+
+        return result;
+    }
 }

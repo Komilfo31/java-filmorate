@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.storage.db;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -24,13 +25,17 @@ import ru.yandex.practicum.filmorate.storage.MpaStorage;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Repository
 @Qualifier("dbFilmStorage")
@@ -78,7 +83,7 @@ public class FilmDbStorage implements FilmStorage {
                 f.duration,
                 m.id AS mpa_id,
                 m.name AS mpa_name,
-                (SELECT COUNT(*) FROM film_likes fl WHERE fl.film_id = f.id) AS likes_count
+                (SELECT COUNT(fl.film_id) FROM film_likes fl WHERE fl.film_id = f.id) AS likes_count
             FROM films f
             JOIN mpa_ratings m ON f.mpa_rating_id = m.id
             ORDER BY likes_count DESC
@@ -110,11 +115,7 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     @Transactional
     public Film saveFilm(Film film) {
-        if (film.getId() == null) {
-            return createFilm(film);
-        } else {
-            return updateFilm(film);
-        }
+        return updateFilm(film);
     }
 
     @Override
@@ -139,9 +140,7 @@ public class FilmDbStorage implements FilmStorage {
             Set<Genre> uniqueGenres = new LinkedHashSet<>(film.getGenres());
             film.setGenres((Collections.unmodifiableSet(uniqueGenres)));
 
-            for (Genre genre : film.getGenres()) {
-                genreService.getGenreById(genre.getId());
-            }
+            validateGenres(film.getGenres());
         }
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -218,12 +217,12 @@ public class FilmDbStorage implements FilmStorage {
         log.debug("Получаем все фильмы");
         try {
             List<Film> films = jdbcTemplate.query(FIND_ALL_QUERY, filmRowMapper);
-            films.forEach(film -> {
-                Set<Genre> genres = getFilmGenres(film.getId().intValue());
-                film.setGenres(genres != null ? genres : new LinkedHashSet<>());
-            });
+            Map<Long, Set<Genre>> genresByFilm = getGenresForFilms(
+                    films.stream().map(Film::getId).collect(Collectors.toList())
+            );
+            films.forEach(f -> f.setGenres(genresByFilm.getOrDefault(f.getId(), Collections.emptySet())));
             return films;
-        } catch (Exception e) {
+        } catch (DataAccessException e) {
             log.error("Ошибка при загрузке фильмов", e);
             throw new RuntimeException("Ошибка при загрузке фильмов", e);
         }
@@ -259,10 +258,19 @@ public class FilmDbStorage implements FilmStorage {
         log.debug("Получаем популярные {} фильмы", limit);
         try {
             List<Film> films = jdbcTemplate.query(GET_POPULAR_FILMS_QUERY, filmRowMapper, limit);
-            films.forEach(film -> {
-                Set<Genre> genres = getFilmGenres(film.getId().intValue());
-                film.setGenres(genres != null ? genres : new LinkedHashSet<>());
-            });
+
+            if (!films.isEmpty()) {
+                List<Long> filmIds = films.stream()
+                        .map(Film::getId)
+                        .collect(Collectors.toList());
+
+                Map<Long, Set<Genre>> genresByFilm = getGenresForFilms(filmIds);
+
+                films.forEach(film ->
+                        film.setGenres(genresByFilm.getOrDefault(film.getId(), new LinkedHashSet<>()))
+                );
+            }
+
             return films;
         } catch (Exception e) {
             log.error("Ошибка при загрузке популярных фильмов", e);
@@ -291,5 +299,43 @@ public class FilmDbStorage implements FilmStorage {
                     ps.setLong(1, film.getId());
                     ps.setLong(2, genre.getId());
                 });
+    }
+
+    private void validateGenres(Set<Genre> genres) {
+        if (genres == null || genres.isEmpty()) return;
+
+        Set<Integer> genreIds = genres.stream()
+                .map(Genre::getId)
+                .collect(Collectors.toSet());
+
+        List<Genre> existingGenres = genreService.getGenresByIds(genreIds);
+
+        if (existingGenres.size() != genreIds.size()) {
+            throw new ValidationException("Указаны несуществующие жанры");
+        }
+    }
+
+    public Map<Long, Set<Genre>> getGenresForFilms(Collection<Long> filmIds) {
+        if (filmIds.isEmpty()) return Collections.emptyMap();
+
+        String sql = String.format(
+                "SELECT fg.film_id, g.id, g.name " +
+                        "FROM film_genres fg " +
+                        "JOIN genres g ON fg.genre_id = g.id " +
+                        "WHERE fg.film_id IN (%s)",
+                filmIds.stream().map(String::valueOf).collect(Collectors.joining(","))
+        );
+
+        Map<Long, Set<Genre>> result = new HashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            Long filmId = rs.getLong("film_id");
+            Genre genre = new Genre(
+                    rs.getInt("id"),
+                    rs.getString("name")
+            );
+            result.computeIfAbsent(filmId, k -> new HashSet<>())
+                    .add(genre);
+        });
+        return result;
     }
 }
