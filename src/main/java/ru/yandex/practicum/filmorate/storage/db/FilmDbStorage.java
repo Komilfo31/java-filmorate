@@ -311,7 +311,7 @@ public class FilmDbStorage implements FilmStorage {
         List<Genre> existingGenres = genreService.getGenresByIds(genreIds);
 
         if (existingGenres.size() != genreIds.size()) {
-            throw new ValidationException("Указаны несуществующие жанры");
+            throw new NotFoundException("Указаны несуществующие жанры");
         }
     }
 

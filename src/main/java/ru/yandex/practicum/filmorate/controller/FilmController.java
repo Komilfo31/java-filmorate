@@ -36,7 +36,7 @@ public class FilmController {
     }
 
     @PostMapping
-    public ResponseEntity<Film> createFilm(@Valid @RequestBody Film film) {
+    public ResponseEntity<Film> createFilm(@RequestBody Film film) {
         filmValidator.validate(film);
         try {
             Film createdFilm = filmService.createFilm(film);
