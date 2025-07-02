@@ -13,9 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import ru.yandex.practicum.filmorate.exception.ErrorResponse;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -42,14 +45,22 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/friends/{friendId}")
-    public void addFriend(@PathVariable long userId, @PathVariable long friendId) {
+    public ResponseEntity<Void> addFriend(@PathVariable long userId,
+                                          @PathVariable long friendId) {
         userService.addFriend(userId, friendId);
+        return ResponseEntity.ok().build();
     }
 
 
     @DeleteMapping("/{userId}/friends/{friendId}")
-    public void removeFriend(@PathVariable long userId, @PathVariable long friendId) {
-        userService.removeFriend(userId, friendId);
+    public ResponseEntity<?> removeFriend(@PathVariable long userId, @PathVariable long friendId) {
+        try {
+            userService.removeFriend(userId, friendId);
+            return ResponseEntity.ok().build();
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("Not found", e.getMessage(), LocalDateTime.now()));
+        }
     }
 
 

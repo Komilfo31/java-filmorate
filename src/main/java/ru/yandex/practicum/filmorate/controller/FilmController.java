@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import ru.yandex.practicum.filmorate.exception.AlreadyExistsException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.validation.FilmValidator;
@@ -33,20 +36,35 @@ public class FilmController {
     }
 
     @PostMapping
-    public ResponseEntity<Film> createFilm(@Valid @RequestBody Film film) {
-        Film createdFilm = filmService.createFilm(film);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdFilm);
+    public ResponseEntity<Film> createFilm(@RequestBody Film film) {
+        filmValidator.validate(film);
+        try {
+            Film createdFilm = filmService.createFilm(film);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdFilm);
+        } catch (AlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(film);
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(film);
+        }
     }
 
     @PutMapping
     public ResponseEntity<Film> updateFilm(@Valid @RequestBody Film film) {
-        Film updatedFilm = filmService.updateFilm(film);
-        return ResponseEntity.ok(updatedFilm);
+        try {
+            filmValidator.validate(film);
+            Film updatedFilm = filmService.updateFilm(film);
+            return ResponseEntity.ok(updatedFilm);
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(film);
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(film);
+        }
     }
 
     @GetMapping("/{id}")
-    public Film getFilm(@PathVariable Long id) {
-        return filmService.getFilmById(id);
+    public ResponseEntity<?> getFilmById(@PathVariable long id) {
+        Film film = filmService.getFilmById(id);
+        return ResponseEntity.ok(film);
     }
 
     @PutMapping("/{filmId}/like/{userId}")
